@@ -1,0 +1,37 @@
+name: ScreenMirror
+options:
+  bundleIdPrefix: com.local
+  deploymentTarget:
+    iOS: "16.0"
+configs:
+  Release: release
+targets:
+  ScreenMirror:
+    type: application
+    platform: iOS
+    sources:
+      - path: ScreenMirror
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.local.screenmirror
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ENABLE_BITCODE: NO
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+    info:
+      path: ScreenMirror/Info.plist
+      properties:
+        CFBundleDisplayName: ScreenMirror
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSLocalNetworkUsageDescription: "ScreenMirror receives your PC's screen over the local network."
+        NSBonjourServices:
+          - _screenmirror._tcp

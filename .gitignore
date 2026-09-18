@@ -1,0 +1,5 @@
+*.xcodeproj/
+ios/ScreenMirror/Info.plist
+__pycache__/
+*.log
+last_frame.jpg

@@ -1,0 +1,54 @@
+name: Build ScreenMirror IPA
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "ios/**"
+      - ".github/workflows/build-ipa.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build App Archive
+        working-directory: ios
+        run: |
+          xcodebuild clean archive \
+            -project ScreenMirror.xcodeproj \
+            -scheme ScreenMirror \
+            -sdk iphoneos \
+            -archivePath $RUNNER_TEMP/ScreenMirror.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package into IPA
+        run: |
+          mkdir -p $RUNNER_TEMP/Payload
+          cp -R $RUNNER_TEMP/ScreenMirror.xcarchive/Products/Applications/ScreenMirror.app $RUNNER_TEMP/Payload/
+          cd $RUNNER_TEMP
+          zip -r ScreenMirror.ipa Payload
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScreenMirror-IPA
+          path: ${{ runner.temp }}/ScreenMirror.ipa
