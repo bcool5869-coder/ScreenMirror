@@ -13,12 +13,14 @@ import io
 import json
 import socket
 import struct
+import threading
 import time
 from ctypes import wintypes
 
 from PIL import Image, ImageDraw, ImageGrab
 
 import usbmux
+from touch import Touch
 
 PORT = 7700
 SERVICE = "_screenmirror._tcp.local."
@@ -109,14 +111,42 @@ def connect(args):
     return socket.create_connection((host, PORT), timeout=5), f"Wi-Fi {host}"
 
 
+def recv_exact(sock, n):
+    data = b""
+    while len(data) < n:
+        chunk = sock.recv(n - len(data))
+        if not chunk:
+            raise ConnectionError("app closed the connection")
+        data += chunk
+    return data
+
+
 def recv_line(sock):
     line = b""
     while not line.endswith(b"\n"):
-        chunk = sock.recv(1)
-        if not chunk:
-            raise ConnectionError("app closed the connection")
-        line += chunk
+        line += recv_exact(sock, 1)
     return line
+
+
+def read_phone(sock, slots, touch):
+    """Phone -> PC messages: 0x01 = a frame was shown, 0x02 = finger (phase, id, x, y)."""
+    try:
+        while True:
+            kind = recv_exact(sock, 1)[0]
+            if kind == 1:
+                slots.release()
+            elif kind == 2:
+                phase, finger, x, y = struct.unpack(">BBff", recv_exact(sock, 10))
+                if touch:
+                    touch.handle(phase, finger, x, y)
+            else:
+                break
+    except OSError:
+        pass
+    finally:
+        if touch:
+            touch.release_all()
+        slots.release()  # wake the sender so it notices we're gone
 
 
 def stream(sock, rect, args):
@@ -126,17 +156,24 @@ def stream(sock, rect, args):
     size = fit(rect, min(hello["w"], args.max_width), hello["h"])
     print(f"  screen {hello['w']}x{hello['h']}, sending {size[0]}x{size[1]}")
 
-    in_flight, frames, sent, t0 = 0, 0, 0, time.time()
+    try:
+        touch = Touch(rect)
+    except OSError as e:
+        touch = None
+        print(f"  touch disabled: {e}")
+    slots = threading.Semaphore(MAX_IN_FLIGHT)
+    reader = threading.Thread(target=read_phone, args=(sock, slots, touch), daemon=True)
+    reader.start()
+
+    frames, sent, t0 = 0, 0, time.time()
     while True:
         start = time.perf_counter()
+        if not slots.acquire(timeout=5):
+            raise TimeoutError("app stopped answering")
+        if not reader.is_alive():
+            raise ConnectionError("app closed the connection")
         jpeg = grab(rect, size, args.quality)
         sock.sendall(struct.pack(">I", len(jpeg)) + jpeg)
-        in_flight += 1
-        while in_flight >= MAX_IN_FLIGHT:
-            acks = sock.recv(64)
-            if not acks:
-                raise ConnectionError("app closed the connection")
-            in_flight -= len(acks)
 
         frames += 1
         sent += len(jpeg)

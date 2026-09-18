@@ -12,12 +12,17 @@ struct ContentView: View {
                     .interpolation(.medium)
                     .aspectRatio(contentMode: .fit)
                     .ignoresSafeArea()
+                TouchLayer(imageSize: frame.size) { phase, id, point in
+                    server.sendFinger(phase, id: id, at: point)
+                }
+                .ignoresSafeArea()
             } else {
                 waiting
             }
         }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
+        .defersSystemGestures(on: .all)  // edge swipes go to the PC first, not iOS
     }
 
     private var waiting: some View {

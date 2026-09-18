@@ -32,16 +32,21 @@ python pc/sender.py --monitor 2  # send a different monitor
 
 Lower `--quality` or `--max-width` if Wi-Fi is laggy.
 
+## Touch
+
+Fingers on the phone become real Windows touch input on the monitor being sent: tap to click,
+drag, swipe to scroll, pinch to zoom, long-press to right-click.
+
 ## How it works
 
 The app listens on TCP port 7700. The sender captures the monitor, encodes each frame as JPEG and
 sends it with a 4-byte length prefix. The app answers each frame it shows with one byte, and the
 sender keeps at most two frames in flight, so a slow link drops frames instead of building up lag.
+Finger events travel back on the same connection.
 Over the cable, the connection goes through Apple's usbmux service to the same port.
 
 ## Limits
 
 - This **mirrors** an existing monitor. To use the device as an extra monitor, install a virtual
   display driver and send that monitor with `--monitor`.
-- No touch input yet.
 - The app must stay open in the foreground.

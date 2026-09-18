@@ -8,7 +8,9 @@ import UIKit
 /// cable reaches it through Apple's usbmux tunnel on the PC.
 ///
 /// Wire format:
-///   phone -> PC: one JSON line `{"w":…,"h":…}` (screen pixels, landscape), then one byte per frame shown
+///   phone -> PC: one JSON line `{"w":…,"h":…}` (screen pixels, landscape), then messages:
+///                0x01 = a frame was shown
+///                0x02, phase, finger id, x, y (big-endian Float32, 0-1 across the picture) = a finger
 ///   PC -> phone: 4-byte big-endian length, then that many bytes of JPEG, repeated
 final class FrameServer: ObservableObject {
     static let port: NWEndpoint.Port = 7700
@@ -95,6 +97,15 @@ final class FrameServer: ObservableObject {
             conn.send(content: Data([1]), completion: .idempotent)  // lets the PC send the next frame
             self.readHeader(on: conn)
         }
+    }
+
+    /// Called on the main thread by the touch layer.
+    func sendFinger(_ phase: FingerPhase, id: UInt8, at point: CGPoint) {
+        var data = Data([2, phase.rawValue, id])
+        for value in [Float(point.x), Float(point.y)] {
+            withUnsafeBytes(of: value.bitPattern.bigEndian) { data.append(contentsOf: $0) }
+        }
+        queue.async { self.connection?.send(content: data, completion: .idempotent) }
     }
 
     private func show(status: String) {
